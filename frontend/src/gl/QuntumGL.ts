@@ -28,6 +28,7 @@ import { YieldCurveObject } from './YieldCurveLine';
 export class QuntumGL {
 	private renderer: WebGLRenderer;
 	private scene: Scene = new Scene();
+	private tempScene: Scene = new Scene();
 	private lineScene: Scene = new Scene();
 	private camera: PerspectiveCamera = new PerspectiveCamera(
 		45,
@@ -44,8 +45,8 @@ export class QuntumGL {
 	private obj: { progress: number } = { progress: 0 };
 	private targetLookAtPrevPos: Vector3 = new Vector3();
 	private orbitcontrol: OrbitControls;
-	private selectedCountry: string = 'brazil';
-	private prevSelectedCountry: string = 'brazil';
+	private selectedCountry: string = 'usa';
+	private prevSelectedCountry: string = 'usa';
 	private yieldCurveObjectList: { [key: string]: YieldCurveObject } = {};
 	private axis: Axis;
 	private mouse: Vector2;
@@ -64,10 +65,10 @@ export class QuntumGL {
 		this.renderer.setClearColor(0xffffff, 1);
 		this.renderer.autoClear = false;
 		// this.camera.position.x = -100;
-		this.camera.position.y = 60;
+		this.camera.position.y = 30;
 		this.camera.position.z = 240;
-		this.camera.lookAt(new Vector3(0, 0, 60));
-		this.orbitcontrol = new OrbitControls(this.camera, this.renderer.domElement);
+		this.camera.lookAt(new Vector3(0, 30, 0));
+		// this.orbitcontrol = new OrbitControls(this.camera, this.renderer.domElement);
 		if (store.getState().app.isDebug) this.setupDebug();
 		this.axis = new Axis(this.scene);
 		this.mouse = new Vector2(9999, 9999);
@@ -77,7 +78,6 @@ export class QuntumGL {
 	}
 
 	private setupDebug() {
-		console.log('hello');
 		this.gui = new GUI();
 		this.playAndStopGui = this.gui.add(this, 'playAndStop').name('pause');
 		this.gui.add(this, 'state', ['whole', '2020']).onChange(() => {
@@ -180,7 +180,7 @@ export class QuntumGL {
 		const mat = new MeshBasicMaterial({ color: 0xff0000 });
 		this.debugMesh = new Mesh(sphere, mat);
 		this.debugMesh.scale.set(0.1, 0.1, 0.1);
-		console.log(this.debugMesh);
+		// console.log(this.debugMesh);
 	}
 	private playAndStop() {
 		if (this.isLoop) {
@@ -201,6 +201,7 @@ export class QuntumGL {
 
 		this.renderer.clear(true, true, true);
 		this.renderer.render(this.scene, this.camera);
+		this.renderer.render(this.tempScene, this.camera);
 		this.renderer.clearDepth();
 		this.renderer.render(this.lineScene, this.camera);
 	}
@@ -250,7 +251,11 @@ export class QuntumGL {
 
 	public addData(yieldCurveData: { [key: string]: IYieldCurve[] }) {
 		for (const key in yieldCurveData) {
-			this.yieldCurveObjectList[key] = new YieldCurveObject(key, yieldCurveData[key]);
+			this.yieldCurveObjectList[key] = new YieldCurveObject(
+				key,
+				yieldCurveData[key],
+				this.tempScene
+			);
 		}
 
 		this.scene.add(this.yieldCurveObjectList[this.selectedCountry]);

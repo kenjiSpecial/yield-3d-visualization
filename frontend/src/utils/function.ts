@@ -91,14 +91,9 @@ export function parseData(yieldCurve: IYieldCurve[]) {
 }
 
 export function createLineGeometryData(plot: IPlot[], country: string) {
-	// const date = [];
 	const yieldSize = yieldValues.length;
 	const yieldUnit = grid.x / (yieldSize - 1);
 	const startX = grid.x * -0.5;
-
-	let minY = 0;
-	let maxY = 10;
-
 	const yearRate =
 		endDate.getFullYear() -
 		startDate.getFullYear() +
@@ -106,11 +101,9 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 		(endDate.getDay() - startDate.getDay()) / 365;
 	const dateUnit = grid.z / yearRate;
 	const startZ = grid.z * -0.5;
-	// const faceData: { date: string; type: string }[] = [];
-
-	// const inc = country == 'japan' || country == 'usa' ? 5 : 1;
-
 	const outputData = {};
+	let minY = 0;
+	let maxY = 10;
 
 	for (const key in plot) {
 		const dataByDate = plot[key];
@@ -282,4 +275,59 @@ export function createGeometryData(plot: IPlot[], country: string) {
 		rate: new Float32Array(rates),
 		faceData: faceData,
 	};
+}
+
+export function createSupportLine(plot: IPlot[], country: string) {
+	const yieldSize = yieldValues.length;
+	const yieldUnit = grid.x / (yieldSize - 1);
+	const startX = grid.x * -0.5;
+	const yearRate =
+		endDate.getFullYear() -
+		startDate.getFullYear() +
+		(endDate.getMonth() - startDate.getMonth()) / 12 +
+		(endDate.getDay() - startDate.getDay()) / 365;
+	const dateUnit = grid.z / yearRate;
+	const startZ = grid.z * -0.5;
+	const outputData = {};
+	let minY = 0;
+	let maxY = 10;
+	const linePositionData = [];
+	const dx = 0.0;
+	const dy = 0;
+	const dz = 0.0;
+	let cnt = 0;
+	const inc = country == 'japan' || country == 'usa' ? 50 : 100;
+
+	for (let ii = 0; ii < plot.length; ii = ii + inc) {}
+
+	for (let ii = 0; ii < plot.length; ii = ii + inc) {
+		const dataByDate = plot[ii];
+		const yieldData = dataByDate.yield;
+		const zpos = dataByDate.yearRate * dateUnit + startZ;
+
+		let prev = null;
+		let prevX = null;
+		let j = 0;
+
+		for (const yieldItemData of yieldData) {
+			const x = startX + j * yieldUnit;
+			if (prev !== null && yieldItemData !== null) {
+				const curYVal = ((yieldItemData - minY) / (maxY - minY)) * scaleYield;
+				const prevYVal = ((prev - minY) / (maxY - minY)) * scaleYield;
+				linePositionData.push(prevX, prevYVal + dy, zpos, x, curYVal + dy, zpos);
+			}
+
+			if (yieldItemData !== null) {
+				prev = yieldItemData;
+				prevX = x;
+			}
+			j++;
+		}
+	}
+
+	// console.log(linePositionData);
+	const geometry = new BufferGeometry();
+	geometry.setAttribute('position', new BufferAttribute(new Float32Array(linePositionData), 3));
+
+	return geometry;
 }

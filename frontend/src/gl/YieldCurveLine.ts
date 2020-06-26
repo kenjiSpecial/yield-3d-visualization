@@ -13,7 +13,12 @@ import {
 	Vector3,
 } from 'three';
 import { IYieldCurve } from '../store/app';
-import { parseData, createGeometryData, createLineGeometryData } from '../utils/function';
+import {
+	parseData,
+	createGeometryData,
+	createLineGeometryData,
+	createSupportLine,
+} from '../utils/function';
 import { IPlot } from '../components/types/type';
 import vShader from './shader/graph.vert';
 import fShader from './shader/graph.frag';
@@ -30,16 +35,20 @@ export class YieldCurveObject extends Object3D {
 	private selectedType: string = '';
 	private selectedDate: string = '';
 	private lineMesh?: Mesh;
+	private supportLineMesh: Mesh;
+	private supportLineGeometry: BufferGeometry;
 	public mesh: Mesh;
 	private lineGeometrylist: { [key: string]: BufferGeometry };
 	private line?: LineSegments;
 
-	constructor(country: string, yieldCurveData: IYieldCurve[]) {
+	constructor(country: string, yieldCurveData: IYieldCurve[], scene: Scene) {
 		super();
 		this.yieldCurveData = yieldCurveData;
 		this.plotCurveData = parseData(this.yieldCurveData);
 		this.geoData = createGeometryData(this.plotCurveData, country);
 		this.lineGeometrylist = createLineGeometryData(this.plotCurveData, country);
+		this.supportLineGeometry = createSupportLine(this.plotCurveData, country);
+
 		this.geometry.setAttribute('position', new BufferAttribute(this.geoData.position, 3));
 		this.geometry.setAttribute('rate', new BufferAttribute(this.geoData.rate, 1));
 
@@ -50,7 +59,15 @@ export class YieldCurveObject extends Object3D {
 		});
 
 		this.mesh = new Mesh(this.geometry, material);
+
 		this.add(this.mesh);
+
+		this.supportLineMesh = new LineSegments(
+			this.supportLineGeometry,
+			new LineBasicMaterial({ color: 0xff0000 })
+		);
+
+		if (country == 'usa') scene.add(this.supportLineMesh);
 	}
 
 	private updateDateMesh(lineScene: Scene) {
