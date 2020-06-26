@@ -10,8 +10,8 @@
 		"type-check": "tsc --noEmit",
 		"type-check:watch": "tsc --noEmit --watch",
 		"save-json": "node node/node.js",
-		"build": "rm -rf dist/*.*  && cp node/data.json dist/data.json && parcel build src/index.html --no-source-maps --public-url ./ --out-dir dist",
-		"copy": "cp ../python/data/write/*.json ./dist"
+		"build": "rm -rf dist/*.*  && parcel build src/index.html --no-source-maps --public-url ./ --out-dir dist",
+		"copy": "cp ../python/data/write/*.json ./dist/data"
 	},
 	"dependencies": {
 		"@types/axios": "^0.14.0",

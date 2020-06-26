@@ -1,10 +1,10 @@
 import { AppState, AppActionType, AppActions } from './types';
 import { Action } from 'redux';
-import { INCREMENT } from '../../utils/constants';
+import { INCREMENT, urls } from '../../utils/constants';
 
 const initialState: AppState = {
 	isLoaded: false,
-	yieldCurve: [],
+	yieldCurve: {},
 	isDebug: false,
 };
 
@@ -13,7 +13,14 @@ const app = (state: AppState = initialState, action: AppActions): AppState => {
 		case AppActionType.START_LOAD:
 			return { ...state, isLoaded: false };
 		case AppActionType.LOADED:
-			return { ...state, isLoaded: true, yieldCurve: action.yieldCurve };
+			state.yieldCurve[action.yieldCurve.country] = action.yieldCurve.data;
+			let cnt = 0;
+			for (let key in state.yieldCurve) {
+				cnt++;
+			}
+			const isLoaded = cnt == urls.length ? true : false;
+
+			return { ...state, isLoaded: isLoaded };
 		case AppActionType.UPDATE_DEBUG:
 			return { ...state, isDebug: action.debug };
 		default:

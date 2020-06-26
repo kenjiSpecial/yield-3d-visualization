@@ -3,3 +3,6 @@ mysqlclient
 marshmallow-sqlalchemy
 mysql-connector-python
 fastapi
+uvicorn
+orjson 
+pandas 

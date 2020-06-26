@@ -35,6 +35,8 @@ services:
       - mysql_db
     networks:
       - app-tier
+    ports:
+      - "8000:8000"
     volumes:
       - ./python:/root
       - pycache_volume:/root/.cache

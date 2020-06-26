@@ -2,7 +2,9 @@ import { Action } from 'redux';
 
 export interface AppState {
 	isLoaded: boolean;
-	yieldCurve: IYieldCurve[];
+	yieldCurve: {
+		[key: string]: IYieldCurve[];
+	};
 	isDebug: boolean;
 }
 
@@ -32,7 +34,7 @@ export interface IYieldCurve {
 
 export interface LoadedAction extends Action {
 	type: AppActionType.LOADED;
-	yieldCurve: IYieldCurve[];
+	yieldCurve: { country: string; data: IYieldCurve[] };
 }
 
 export interface startLoadAction extends Action {

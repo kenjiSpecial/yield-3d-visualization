@@ -17,7 +17,7 @@ export class BgGL extends Component {
 			const appState = store.getState().app;
 
 			if (prevAppLoaded === false && appState.isLoaded) {
-				(this.app as QuntumGL).updateData(appState.yieldCurve);
+				(this.app as QuntumGL).addData(appState.yieldCurve);
 			}
 
 			prevAppLoaded = appState.isLoaded;

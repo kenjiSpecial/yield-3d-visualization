@@ -11,6 +11,9 @@ import {
 	Vector3,
 	RawShaderMaterial,
 	DoubleSide,
+	Vector2,
+	Raycaster,
+	SphereGeometry,
 } from 'three';
 import { GUI, GUIController } from 'dat.gui';
 import { gsap } from 'gsap';
@@ -18,13 +21,14 @@ import { store } from '../store';
 import { IYieldCurve } from '../store/app';
 import { parseData, createGeometryData } from '../utils/function';
 import { IPlot } from '../components/types/type';
-import vShader from './shader/graph.vert';
-import fShader from './shader/graph.frag';
 import { OrbitControls } from 'three-orbitcontrols-ts';
+import { Axis } from './axis';
+import { YieldCurveObject } from './YieldCurveLine';
 
 export class QuntumGL {
 	private renderer: WebGLRenderer;
 	private scene: Scene = new Scene();
+	private lineScene: Scene = new Scene();
 	private camera: PerspectiveCamera = new PerspectiveCamera(
 		45,
 		window.innerWidth / window.innerHeight,
@@ -36,11 +40,19 @@ export class QuntumGL {
 	private playAndStopGui?: GUIController;
 	private mesh: Mesh | null = null;
 	private appState: number = 0;
-	private yieldCurveData: IPlot[] = [];
 	private state: string = 'whole';
 	private obj: { progress: number } = { progress: 0 };
 	private targetLookAtPrevPos: Vector3 = new Vector3();
 	private orbitcontrol: OrbitControls;
+	private selectedCountry: string = 'brazil';
+	private prevSelectedCountry: string = 'brazil';
+	private yieldCurveObjectList: { [key: string]: YieldCurveObject } = {};
+	private axis: Axis;
+	private mouse: Vector2;
+	private raycaster: Raycaster;
+	private width: number = 0;
+	private height: number = 0;
+	private debugMesh: Mesh | null = null;
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.loop = this.loop.bind(this);
@@ -50,22 +62,24 @@ export class QuntumGL {
 			antialias: true,
 		});
 		this.renderer.setClearColor(0xffffff, 1);
-		this.camera.position.x = -100;
+		this.renderer.autoClear = false;
+		// this.camera.position.x = -100;
 		this.camera.position.y = 60;
-		this.camera.position.z = 160;
-		this.camera.lookAt(new Vector3());
+		this.camera.position.z = 240;
+		this.camera.lookAt(new Vector3(0, 0, 60));
 		this.orbitcontrol = new OrbitControls(this.camera, this.renderer.domElement);
-
 		if (store.getState().app.isDebug) this.setupDebug();
+		this.axis = new Axis(this.scene);
+		this.mouse = new Vector2(9999, 9999);
+		this.raycaster = new Raycaster();
+		this.setEvents();
 		this.resize();
 	}
 
 	private setupDebug() {
+		console.log('hello');
 		this.gui = new GUI();
 		this.playAndStopGui = this.gui.add(this, 'playAndStop').name('pause');
-		// const obj = {
-		// 	progress: 0,
-		// };
 		this.gui.add(this, 'state', ['whole', '2020']).onChange(() => {
 			const targetLookAtPrevPos = this.targetLookAtPrevPos.clone();
 
@@ -146,24 +160,28 @@ export class QuntumGL {
 						this.camera.lookAt(lookAt);
 					},
 				});
-
-				// this.camera.position.z = 100;
-				// this.camera.position.y = 20;
-				// this.camera.position.x = -70;
-				// this.camera.lookAt(new Vector3(-30, 0, 95));
 			}
 		});
-		// this.gui.add(this, 'appState').listen();
+
+		this.gui
+			.add(this, 'selectedCountry', [
+				'japan',
+				'usa',
+				'india',
+				'germany',
+				'brazil',
+				'australia',
+			])
+			.onChange(() => {
+				this.updateCountry();
+			});
+
+		const sphere = new SphereGeometry(2, 4, 4);
+		const mat = new MeshBasicMaterial({ color: 0xff0000 });
+		this.debugMesh = new Mesh(sphere, mat);
+		this.debugMesh.scale.set(0.1, 0.1, 0.1);
+		console.log(this.debugMesh);
 	}
-
-	private createMesh() {
-		let geometry = new BoxGeometry(20, 20, 20);
-		let mat = new MeshBasicMaterial({ color: 0xffff00 });
-
-		this.mesh = new Mesh(geometry, mat);
-		(this.scene as Scene).add(this.mesh);
-	}
-
 	private playAndStop() {
 		if (this.isLoop) {
 			this.pause();
@@ -175,7 +193,49 @@ export class QuntumGL {
 	}
 
 	private loop() {
+		this.raycaster.setFromCamera(this.mouse, this.camera);
+
+		this.axis.update(this.camera);
+
+		this.updateIntersect();
+
+		this.renderer.clear(true, true, true);
 		this.renderer.render(this.scene, this.camera);
+		this.renderer.clearDepth();
+		this.renderer.render(this.lineScene, this.camera);
+	}
+
+	private updateIntersect() {
+		const intersects = this.raycaster.intersectObject(
+			this.yieldCurveObjectList[this.selectedCountry].mesh
+		);
+		if (intersects.length > 0) {
+			const intersect = intersects[0];
+
+			if (this.debugMesh) {
+				this.debugMesh.position.set(
+					intersect.point.x,
+					intersect.point.y + 0.1,
+					intersect.point.z
+				);
+				this.scene.add(this.debugMesh);
+			}
+
+			this.yieldCurveObjectList[this.selectedCountry].findIntersect(
+				intersect,
+				this.lineScene
+			);
+		} else {
+			if (this.debugMesh) {
+				this.scene.remove(this.debugMesh);
+			}
+		}
+	}
+
+	private updateCountry() {
+		this.scene.remove(this.yieldCurveObjectList[this.prevSelectedCountry]);
+		this.scene.add(this.yieldCurveObjectList[this.selectedCountry]);
+		this.prevSelectedCountry = this.selectedCountry;
 	}
 
 	public start() {
@@ -188,29 +248,12 @@ export class QuntumGL {
 		gsap.ticker.remove(this.loop);
 	}
 
-	public updateData(yieldCurve: IYieldCurve[]) {
-		this.yieldCurveData = parseData(yieldCurve);
-		var geometry = new BufferGeometry();
-		const output = createGeometryData(this.yieldCurveData);
-		geometry.setAttribute('position', new BufferAttribute(output.position, 3));
-		geometry.setAttribute('rate', new BufferAttribute(output.rate, 1));
+	public addData(yieldCurveData: { [key: string]: IYieldCurve[] }) {
+		for (const key in yieldCurveData) {
+			this.yieldCurveObjectList[key] = new YieldCurveObject(key, yieldCurveData[key]);
+		}
 
-		const material = new RawShaderMaterial({
-			fragmentShader: fShader,
-			vertexShader: vShader,
-			side: DoubleSide,
-		});
-		var mesh = new Mesh(geometry, material);
-
-		this.scene.add(mesh);
-
-		const size = 100;
-		const divisions = 10;
-
-		const gridHelper = new GridHelper(size, divisions);
-		gridHelper.scale.set(1, 1, 2);
-		gridHelper.position.y = -0.1;
-		this.scene.add(gridHelper);
+		this.scene.add(this.yieldCurveObjectList[this.selectedCountry]);
 
 		this.start();
 	}
@@ -223,11 +266,24 @@ export class QuntumGL {
 		}
 	}
 
+	onMouseMove(ev: MouseEvent) {
+		this.mouse.x = (ev.clientX / this.width) * 2 - 1;
+		this.mouse.y = (ev.clientY / this.height) * -2 + 1;
+	}
+
 	resize() {
-		this.camera.aspect = window.innerWidth / window.innerHeight;
+		this.width = window.innerWidth;
+		this.height = window.innerHeight;
+
+		this.camera.aspect = this.width / this.height;
 		this.camera.updateProjectionMatrix();
 
-		this.renderer.setSize(window.innerWidth, window.innerHeight);
+		this.renderer.setSize(this.width, this.height);
+	}
+
+	setEvents() {
+		this.onMouseMove = this.onMouseMove.bind(this);
+		this.renderer.domElement.addEventListener('mousemove', this.onMouseMove);
 	}
 
 	destroy() {}

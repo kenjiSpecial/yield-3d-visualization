@@ -7,9 +7,9 @@ const file = './node/data.json';
 axios
 	.get(LOCAL_URL)
 	.then(function (response) {
-		console.log(response);
+		// console.log(response);
 		// store.dispatch(loadedHandler(response.data));
-		jsonfile.writeFile(file, response.data);
+		jsonfile.writeFile(file, { data: response.data, country: 'usa' });
 	})
 	.catch(function (error) {
 		console.log(error);

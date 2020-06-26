@@ -1,10 +1,19 @@
-import { AppActionType, startLoadAction, LoadedAction, UpdateDebugAction, IYield } from './types';
+import {
+	AppActionType,
+	startLoadAction,
+	LoadedAction,
+	UpdateDebugAction,
+	IYieldCurve,
+} from './types';
 
 export const startLoadHandler = (): startLoadAction => ({
 	type: AppActionType.START_LOAD,
 });
 
-export const loadedHandler = (yieldCurve: IYield[]): LoadedAction => ({
+export const loadedHandler = (yieldCurve: {
+	country: string;
+	data: IYieldCurve[];
+}): LoadedAction => ({
 	type: AppActionType.LOADED,
 	yieldCurve: yieldCurve,
 });

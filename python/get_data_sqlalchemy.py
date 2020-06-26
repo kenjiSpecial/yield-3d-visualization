@@ -2,13 +2,16 @@
 import urllib.request
 import mysql.connector as mysql
 from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, Integer, String, DATE, DECIMAL
 from xml.dom import minidom
 from datetime import date
 
 print('Beginning file download with urllib2...')
 
-url = "https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/XmlView.aspx?data=yield"
-# url = "https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/XmlView.aspx?data=yieldall"
+# url = "https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/XmlView.aspx?data=yield"
+url = "https://www.treasury.gov/resource-center/data-chart-center/interest-rates/pages/XmlView.aspx?data=yieldall"
 
 # urllib.request.urlretrieve(url, './test.xml')
 
@@ -101,67 +104,130 @@ with urllib.request.urlopen(url) as response:
     host = "mysql_db"  # docker-composeで定義したMySQLのサービス名
     database_name = "debt"
 
-    # conn = mysql.connect(
-    #     host="mysql_db",
-    #     user="user",
-    #     passwd="password",
-    #     port=3306,
-    #     database="employees"
-    # )
-
-    conn = mysql.connect(user=user_name, password=password,
-                         host=host, buffered=True)
-    cursor = conn.cursor()
-    databases = ("show databases")
-    cursor.execute(databases)
-    is_debt_db = False
-    for (databases) in cursor:
-        if databases[0] == database_name:
-            is_debt_db = True
-
-    if not is_debt_db:
-        databaseStr = "CREATE DATABASE " + database_name
-        cursor.execute(databaseStr)
-
-    conn = mysql.connect(
-        host="mysql_db",
-        user=user_name,
-        passwd="password",
-        port=3306,
-        database=database_name
+    DATABASE = 'mysql://%s:%s@%s/%s?charset=utf8' % (
+        user_name,
+        password,
+        host,
+        database_name,
     )
-    conn.ping(reconnect=True)
 
-    cursor = conn.cursor()
+    # DBとの接続
+    engine = create_engine(
+        DATABASE,
+        encoding="utf-8",
+        echo=True
+    )
 
+    Session = sessionmaker(bind=engine)
+    session = Session()
+
+    Base = declarative_base()
+
+    class Debt(Base):
+        __tablename__ = 'debt'
+        id = Column(Integer, primary_key=True)
+        date = Column(DATE)
+        m1 = Column(DECIMAL(precision=6, scale=4))
+        m2 = Column(DECIMAL(precision=6, scale=4))
+        m3 = Column(DECIMAL(precision=6, scale=4))
+        m6 = Column(DECIMAL(precision=6, scale=4))
+        y1 = Column(DECIMAL(precision=6, scale=4))
+        y3 = Column(DECIMAL(precision=6, scale=4))
+        y5 = Column(DECIMAL(precision=6, scale=4))
+        y7 = Column(DECIMAL(precision=6, scale=4))
+        y10 = Column(DECIMAL(precision=6, scale=4))
+        y20 = Column(DECIMAL(precision=6, scale=4))
+        y30 = Column(DECIMAL(precision=6, scale=4))
+
+    # Debt.__table__.drop(engine)
+    connection = engine.raw_connection()
+    cursor = connection.cursor()
     cursor.execute("DROP TABLE IF EXISTS debt")
-    # cursor.execute("")
-    # Creating table as per requirement
-    sql = "CREATE TABLE debt(date DATE, 1month  DECIMAL(12, 10), " \
-        "2month DECIMAL(12, 10), 3month  DECIMAL(12, 10), " \
-        "6month DECIMAL(12, 10), 1year DECIMAL(12, 10),"\
-        "3year DECIMAL(12, 10), 5year DECIMAL(12, 10),"\
-        "7year DECIMAL(12, 10), 10year DECIMAL(12, 10),"\
-        "20year DECIMAL(12, 10), 30year DECIMAL(12, 10)"\
-        ")"
+    connection.commit()
+    cursor.close()
+    Base.metadata.create_all(engine)
 
-    cursor.execute(sql)
-
+    debt_data_list = []
     for data_item in data:
-        # item_str = "INSERT INTO debt() VALUES ({})".format(
-        #     data_item['id'])a
-        # print(item_str)
         date_str = data_item['date'].split("-")
         now = date(int(date_str[0]), int(date_str[1]), int(date_str[2]))
-        sqp = ""
-        val = ()
+        debt_data = Debt(date=now,
+                         m1=data_item['1month'], m2=data_item['2month'],
+                         m3=data_item['3month'], m6=data_item['6month'],
+                         y1=data_item['1year'], y3=data_item['3year'],
+                         y5=data_item['5year'], y7=data_item['7year'],
+                         y10=data_item['10year'], y20=data_item['20year'],
+                         y30=data_item['30year'])
 
-        sql = "INSERT INTO debt(date, 1month, 2month, 3month, 6month, 1year, 3year, 5year, 7year," \
-            " 10year, 20year, 30year) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
-        val = (now, data_item['1month'], data_item['2month'],
-               data_item['3month'], data_item['6month'],
-               data_item['1year'], data_item['3year'], data_item['5year'],
-               data_item['7year'], data_item['10year'], data_item['20year'], data_item['30year'])
+        debt_data_list.append(debt_data)
 
-        cursor.execute(sql, val)
-        conn.commit()
+    session.add_all(debt_data_list)
+    session.commit()
+
+    # print(debt_data_list)
+
+
+# conn = mysql.connect(
+#     host="mysql_db",
+#     user="user",
+#     passwd="password",
+#     port=3306,
+#     database="employees"
+# )
+
+# conn = mysql.connect(user=user_name, password=password,
+#                      host=host, buffered=True)
+# cursor = conn.cursor()
+# databases = ("show databases")
+# cursor.execute(databases)
+# is_debt_db = False
+# for (databases) in cursor:
+#     if databases[0] == database_name:
+#         is_debt_db = True
+
+# if not is_debt_db:
+#     databaseStr = "CREATE DATABASE " + database_name
+#     cursor.execute(databaseStr)
+
+# conn = mysql.connect(
+#     host="mysql_db",
+#     user=user_name,
+#     passwd="password",
+#     port=3306,
+#     database=database_name
+# )
+# conn.ping(reconnect=True)
+
+# cursor = conn.cursor()
+
+# cursor.execute("DROP TABLE IF EXISTS debt")
+# # cursor.execute("")
+# # Creating table as per requirement
+# sql = "CREATE TABLE debt(date DATE, 1month  DECIMAL(12, 10), " \
+#     "2month DECIMAL(12, 10), 3month  DECIMAL(12, 10), " \
+#     "6month DECIMAL(12, 10), 1year DECIMAL(12, 10),"\
+#     "3year DECIMAL(12, 10), 5year DECIMAL(12, 10),"\
+#     "7year DECIMAL(12, 10), 10year DECIMAL(12, 10),"\
+#     "20year DECIMAL(12, 10), 30year DECIMAL(12, 10)"\
+#     ")"
+
+# cursor.execute(sql)
+
+# for data_item in data:
+#     # item_str = "INSERT INTO debt() VALUES ({})".format(
+#     #     data_item['id'])a
+#     # print(item_str)
+#     date_str = data_item['date'].split("-")
+#     now = date(int(date_str[0]), int(date_str[1]), int(date_str[2]))
+#     sqp = ""
+#     val = ()
+
+#     sql = "INSERT INTO debt(date, 1month, 2month, 3month, 6month, 1year, 3year, 5year, 7year," \
+#         " 10year, 20year, 30year) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)"
+#     val = (now, data_item['1month'], data_item['2month'],
+#            data_item['3month'], data_item['6month'],
+#            data_item['1year'], data_item['3year'], data_item['5year'],
+#            data_item['7year'], data_item['10year'], data_item['20year'], data_item['30year'])
+
+#     cursor.execute(sql, val)
+#     conn.commit()
