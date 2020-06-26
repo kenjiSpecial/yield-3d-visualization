@@ -31,6 +31,10 @@ export class YieldCurveObject extends Object3D {
 		position: Float32Array;
 		rate: Float32Array;
 		faceData: { date: string; type: string }[];
+		startZ: number;
+		startX: number;
+		dateUnit: number;
+		yieldUnit: number;
 	};
 	private selectedType: string = '';
 	private selectedDate: string = '';
@@ -40,6 +44,7 @@ export class YieldCurveObject extends Object3D {
 	public mesh: Mesh;
 	private lineGeometrylist: { [key: string]: BufferGeometry };
 	private line?: LineSegments;
+	private typeLine?: LineSegments;
 
 	constructor(country: string, yieldCurveData: IYieldCurve[], scene: Scene) {
 		super();
@@ -56,6 +61,12 @@ export class YieldCurveObject extends Object3D {
 			fragmentShader: fShader,
 			vertexShader: vShader,
 			side: DoubleSide,
+			uniforms: {
+				startZ: { value: this.geoData.startZ },
+				startX: { value: this.geoData.startX },
+				dateUnit: { value: this.geoData.dateUnit },
+				yieldUnit: { value: this.geoData.yieldUnit },
+			},
 		});
 
 		this.mesh = new Mesh(this.geometry, material);
@@ -67,7 +78,7 @@ export class YieldCurveObject extends Object3D {
 			new LineBasicMaterial({ color: 0xff0000 })
 		);
 
-		if (country == 'usa') scene.add(this.supportLineMesh);
+		// if (country == 'usa') scene.add(this.supportLineMesh);
 	}
 
 	private updateDateMesh(lineScene: Scene) {
@@ -82,7 +93,18 @@ export class YieldCurveObject extends Object3D {
 		}
 	}
 
-	private updateTypeMesh() {}
+	private updateTypeMesh(lineScene: Scene) {
+		if (this.typeLine) {
+			this.typeLine.geometry = this.lineGeometrylist[this.selectedType];
+		} else {
+			this.typeLine = new LineSegments(
+				this.lineGeometrylist[this.selectedType],
+				new LineBasicMaterial({ color: 0x000000 })
+			);
+			lineScene.add(this.typeLine);
+		}
+		// console.log(this.selectedType);
+	}
 
 	public findIntersect(intersection: Intersection, lineScene: Scene) {
 		const intersectedFace = intersection.face as Face3;
@@ -113,7 +135,7 @@ export class YieldCurveObject extends Object3D {
 		}
 		if (this.selectedType !== faceData.type) {
 			this.selectedType = faceData.type;
-			this.updateTypeMesh();
+			this.updateTypeMesh(lineScene);
 		}
 	}
 }

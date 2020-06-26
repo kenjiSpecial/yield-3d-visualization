@@ -45,8 +45,8 @@ export class QuntumGL {
 	private obj: { progress: number } = { progress: 0 };
 	private targetLookAtPrevPos: Vector3 = new Vector3();
 	private orbitcontrol: OrbitControls;
-	private selectedCountry: string = 'usa';
-	private prevSelectedCountry: string = 'usa';
+	private selectedCountry: string = 'brazil';
+	private prevSelectedCountry: string = 'brazil';
 	private yieldCurveObjectList: { [key: string]: YieldCurveObject } = {};
 	private axis: Axis;
 	private mouse: Vector2;
@@ -64,11 +64,10 @@ export class QuntumGL {
 		});
 		this.renderer.setClearColor(0xffffff, 1);
 		this.renderer.autoClear = false;
-		// this.camera.position.x = -100;
 		this.camera.position.y = 30;
 		this.camera.position.z = 240;
 		this.camera.lookAt(new Vector3(0, 30, 0));
-		// this.orbitcontrol = new OrbitControls(this.camera, this.renderer.domElement);
+		this.orbitcontrol = new OrbitControls(this.camera, this.renderer.domElement);
 		if (store.getState().app.isDebug) this.setupDebug();
 		this.axis = new Axis(this.scene);
 		this.mouse = new Vector2(9999, 9999);

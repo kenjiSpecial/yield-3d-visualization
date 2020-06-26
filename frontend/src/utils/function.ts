@@ -104,6 +104,7 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 	const outputData = {};
 	let minY = 0;
 	let maxY = 10;
+	const dataByType: { z: number; value: number | null }[][] = [];
 
 	for (const key in plot) {
 		const dataByDate = plot[key];
@@ -114,6 +115,7 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 		let prev = null;
 		let prevX = null;
 		let j = 0;
+
 		for (const yieldItemData of yieldData) {
 			const x = startX + j * yieldUnit;
 			if (prev !== null && yieldItemData !== null) {
@@ -126,11 +128,15 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 				prev = yieldItemData;
 				prevX = x;
 			}
+			if (!dataByType[j]) {
+				dataByType[j] = [];
+			}
+
+			dataByType[j].push({ z: zpos, value: yieldItemData });
+
 			j++;
 		}
-		if (country == 'brazil') {
-			// console.log(linePositionData);
-		}
+
 		const geometry = new BufferGeometry();
 		geometry.setAttribute(
 			'position',
@@ -138,6 +144,39 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 		);
 
 		outputData[dataByDate.date] = geometry;
+	}
+
+	// console.log(dataByType);
+	for (let ii = 0; ii < yieldValues.length; ii++) {
+		const typeData = dataByType[ii];
+		const xpos = startX + ii * yieldUnit;
+
+		const linePositionData = [];
+		let prev = null;
+		let prevz = null;
+
+		for (let j = 0; j < typeData.length; j++) {
+			const typeDataItem = typeData[j];
+			const yieldItemData = typeDataItem.value;
+			const zpos = typeDataItem.z;
+			if (prev !== null && yieldItemData !== null) {
+				const curYVal = ((yieldItemData - minY) / (maxY - minY)) * scaleYield;
+				const prevYVal = ((prev - minY) / (maxY - minY)) * scaleYield;
+				linePositionData.push(xpos, prevYVal, zpos, xpos, curYVal, zpos);
+			}
+
+			// if (yieldItemData !== null) {
+			prev = yieldItemData;
+			prevz = zpos;
+			// }
+		}
+
+		const geometry = new BufferGeometry();
+		geometry.setAttribute(
+			'position',
+			new BufferAttribute(new Float32Array(linePositionData), 3)
+		);
+		outputData[yieldValues[ii]] = geometry;
 	}
 
 	return outputData;
@@ -163,7 +202,7 @@ export function createGeometryData(plot: IPlot[], country: string) {
 	const startZ = grid.z * -0.5;
 	const faceData: { date: string; type: string }[] = [];
 
-	const inc = country == 'japan' || country == 'usa' ? 5 : 10;
+	const inc = country == 'japan' || country == 'usa' ? 5 : 1;
 
 	for (let ii = 0; ii < plot.length - inc; ii = ii + inc) {
 		const plotItem = plot[ii];
@@ -274,6 +313,10 @@ export function createGeometryData(plot: IPlot[], country: string) {
 		position: new Float32Array(positions),
 		rate: new Float32Array(rates),
 		faceData: faceData,
+		startZ: startZ,
+		startX: startX,
+		dateUnit: dateUnit,
+		yieldUnit: yieldUnit,
 	};
 }
 
