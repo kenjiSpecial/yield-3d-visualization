@@ -101,7 +101,7 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 		(endDate.getDay() - startDate.getDay()) / 365;
 	const dateUnit = grid.z / yearRate;
 	const startZ = grid.z * -0.5;
-	const outputData = {};
+	const lineGeometrylist = {};
 	let minY = 0;
 	let maxY = 10;
 	const dataByType: { z: number; value: number | null }[][] = [];
@@ -143,10 +143,11 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 			new BufferAttribute(new Float32Array(linePositionData), 3)
 		);
 
-		outputData[dataByDate.date] = geometry;
+		lineGeometrylist[dataByDate.date] = geometry;
 	}
 
 	// console.log(dataByType);
+
 	for (let ii = 0; ii < yieldValues.length; ii++) {
 		const typeData = dataByType[ii];
 		const xpos = startX + ii * yieldUnit;
@@ -165,10 +166,8 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 				linePositionData.push(xpos, prevYVal, zpos, xpos, curYVal, zpos);
 			}
 
-			// if (yieldItemData !== null) {
 			prev = yieldItemData;
 			prevz = zpos;
-			// }
 		}
 
 		const geometry = new BufferGeometry();
@@ -176,10 +175,10 @@ export function createLineGeometryData(plot: IPlot[], country: string) {
 			'position',
 			new BufferAttribute(new Float32Array(linePositionData), 3)
 		);
-		outputData[yieldValues[ii]] = geometry;
+		lineGeometrylist[yieldValues[ii]] = geometry;
 	}
 
-	return outputData;
+	return { lineGeometrylist };
 }
 
 export function createGeometryData(plot: IPlot[], country: string) {
@@ -204,107 +203,64 @@ export function createGeometryData(plot: IPlot[], country: string) {
 
 	const inc = country == 'japan' || country == 'usa' ? 5 : 1;
 
-	for (let ii = 0; ii < plot.length - inc; ii = ii + inc) {
+	for (let ii = 0; ii < plot.length - inc; ii = inc + ii) {
 		const plotItem = plot[ii];
-		const curDate = plotItem.date;
 		const nextPlotItem = plot[ii + inc];
-		const nextDate = nextPlotItem.date;
 		const yieldData = plotItem.yield;
 		const nextYieldData = nextPlotItem.yield;
 		const z0pos = plotItem.yearRate * dateUnit + startZ;
 		const z1pos = nextPlotItem.yearRate * dateUnit + startZ;
+		let yi00Data = yieldData[0];
+		let yi01Data = nextYieldData[0];
+		let x00pos = startX;
+		let x01pos = startX;
+		// console.log(yieldData);
 
-		let startBtPt;
-		let startBtPtY;
-		let startBtValue;
-		let startBtRate;
-		let startBtType;
-		let startTpPt;
-		let startTpPtY;
-		let startTpValue;
-		let startTpRate;
-		let startTpType;
+		for (let jj = 0; jj < yieldData.length - 1; jj++) {
+			const yi10Data = yieldData[jj + 1];
+			const x10pos = startX + yieldUnit * (jj + 1);
+			const yi11Data = nextYieldData[jj + 1];
+			const x11pos = startX + yieldUnit * (jj + 1);
 
-		for (let j = yieldData.length - 1; j > -1; j--) {
-			if (yieldData[j] !== null) {
-				startTpPt = startX + j * yieldUnit;
-				startTpValue = yieldData[j] as number;
-				startTpRate = (startTpValue - minY) / (maxY - minY);
-				startTpPtY = startTpRate * scaleYield;
-				startTpType = yieldValues[j];
-				break;
-			}
-		}
+			if (yi00Data == null || yi10Data == null || yi01Data == null || yi11Data == null) {
+			} else {
+				const rate00 = (yi00Data - minY) / (maxY - minY);
+				const y00Value = rate00 * scaleYield;
+				const rate10 = (yi10Data - minY) / (maxY - minY);
+				const y10Value = rate10 * scaleYield;
+				const rate01 = (yi01Data - minY) / (maxY - minY);
+				const y01Value = rate01 * scaleYield;
+				const rate11 = (yi11Data - minY) / (maxY - minY);
+				const y11Value = rate11 * scaleYield;
+				const curDate = plotItem.date;
+				const nextDate = nextPlotItem.date;
+				// const type = plotItem.yield;
 
-		for (let j = 0; j < nextYieldData.length; j++) {
-			if (nextYieldData[j] !== null) {
-				startBtPt = startX + j * yieldUnit;
-				startBtValue = nextYieldData[j] as number;
-				startBtRate = (startBtValue - minY) / (maxY - minY);
-				startBtPtY = startBtRate * scaleYield;
-				startBtType = yieldValues[j];
-				break;
-			}
-		}
+				positions.push(x00pos, y00Value, z0pos);
+				faceData.push({ date: curDate, type: yieldValues[jj] });
+				positions.push(x01pos, y01Value, z1pos);
+				faceData.push({ date: nextDate, type: yieldValues[jj] });
+				positions.push(x10pos, y10Value, z0pos);
+				faceData.push({ date: curDate, type: yieldValues[jj + 1] });
+				rates.push(rate00, rate01, rate10);
 
-		let x0;
-		let x1;
-		let y0 = null;
-		let y1 = null;
-		let type0 = '';
-		let type1 = '';
-		for (let j = 0; j < yieldData.length; j++) {
-			x1 = startX + j * yieldUnit;
-			y1 = yieldData[j];
-			type1 = yieldValues[j];
-
-			if (y1 != null && y0 != null) {
-				const rate0 = (y0 - minY) / (maxY - minY);
-				const y0Val = rate0 * scaleYield;
-
-				const rate1 = (y1 - minY) / (maxY - minY);
-				const y1Val = rate1 * scaleYield;
-
-				positions.push(x0, y0Val, z0pos, x1, y1Val, z0pos, startBtPt, startBtPtY, z1pos);
-				rates.push(rate0, rate1, startBtRate);
-				faceData.push({ date: curDate, type: type0 });
-				faceData.push({ date: curDate, type: type1 });
-				faceData.push({ date: nextDate, type: startBtType as string });
+				positions.push(x10pos, y10Value, z0pos);
+				faceData.push({ date: curDate, type: yieldValues[jj + 1] });
+				positions.push(x01pos, y01Value, z1pos);
+				faceData.push({ date: nextDate, type: yieldValues[jj] });
+				positions.push(x11pos, y11Value, z1pos);
+				faceData.push({ date: nextDate, type: yieldValues[jj + 1] });
+				rates.push(rate10, rate01, rate11);
 			}
 
-			if (y1 != null) {
-				x0 = x1;
-				y0 = y1;
-				type0 = type1;
-			}
-		}
-
-		y0 = null;
-		y1 = null;
-
-		for (let j = 0; j < nextYieldData.length; j++) {
-			x1 = startX + j * yieldUnit;
-			y1 = nextYieldData[j];
-			type1 = yieldValues[j];
-
-			if (y1 != null && y0 != null) {
-				const rate0 = (y0 - minY) / (maxY - minY);
-				const y0Val = rate0 * scaleYield;
-
-				const rate1 = (y1 - minY) / (maxY - minY);
-				const y1Val = rate1 * scaleYield;
-
-				positions.push(x1, y1Val, z1pos, x0, y0Val, z1pos, startTpPt, startTpPtY, z0pos);
-				rates.push(rate1, rate0, startTpRate);
-				faceData.push({ date: nextDate, type: type1 });
-				faceData.push({ date: nextDate, type: type0 });
-				faceData.push({ date: curDate, type: startTpType as string });
+			if (yi10Data !== null) {
+				x00pos = x10pos;
+				yi00Data = yi10Data;
 			}
 
-			if (y1 != null) {
-				x0 = x1;
-				y0 = y1;
-				type0 = type1;
+			if (yi11Data !== null) {
+				x01pos = x11pos;
+				yi01Data = yi11Data;
 			}
 		}
 	}

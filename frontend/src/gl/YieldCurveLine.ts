@@ -22,6 +22,7 @@ import {
 import { IPlot } from '../components/types/type';
 import vShader from './shader/graph.vert';
 import fShader from './shader/graph.frag';
+import { YIELD_CURVE_LINE } from '../utils/constants';
 
 export class YieldCurveObject extends Object3D {
 	private geometry: BufferGeometry = new BufferGeometry();
@@ -36,6 +37,7 @@ export class YieldCurveObject extends Object3D {
 		dateUnit: number;
 		yieldUnit: number;
 	};
+	private country: string;
 	private selectedType: string = '';
 	private selectedDate: string = '';
 	private lineMesh?: Mesh;
@@ -48,10 +50,13 @@ export class YieldCurveObject extends Object3D {
 
 	constructor(country: string, yieldCurveData: IYieldCurve[], scene: Scene) {
 		super();
+
+		this.country = country;
 		this.yieldCurveData = yieldCurveData;
 		this.plotCurveData = parseData(this.yieldCurveData);
 		this.geoData = createGeometryData(this.plotCurveData, country);
-		this.lineGeometrylist = createLineGeometryData(this.plotCurveData, country);
+		const { lineGeometrylist } = createLineGeometryData(this.plotCurveData, country);
+		this.lineGeometrylist = lineGeometrylist;
 		this.supportLineGeometry = createSupportLine(this.plotCurveData, country);
 
 		this.geometry.setAttribute('position', new BufferAttribute(this.geoData.position, 3));
@@ -103,7 +108,6 @@ export class YieldCurveObject extends Object3D {
 			);
 			lineScene.add(this.typeLine);
 		}
-		// console.log(this.selectedType);
 	}
 
 	public findIntersect(intersection: Intersection, lineScene: Scene) {
@@ -136,6 +140,38 @@ export class YieldCurveObject extends Object3D {
 		if (this.selectedType !== faceData.type) {
 			this.selectedType = faceData.type;
 			this.updateTypeMesh(lineScene);
+		}
+
+		//
+		this.dispatchEvent({
+			type: YIELD_CURVE_LINE.UPDATE,
+			country: this.country,
+			date: faceData.date,
+			yieldCurve: faceData.type,
+		});
+	}
+
+	public getPlotData() {
+		return this.plotCurveData;
+	}
+
+	public removeCurve(lineScene: Scene) {
+		if (this.typeLine) {
+			lineScene.remove(this.typeLine);
+		}
+
+		if (this.line) {
+			lineScene.remove(this.line);
+		}
+	}
+
+	public addCurve(lineScene: Scene) {
+		if (this.typeLine) {
+			lineScene.add(this.typeLine);
+		}
+
+		if (this.line) {
+			lineScene.add(this.line);
 		}
 	}
 }

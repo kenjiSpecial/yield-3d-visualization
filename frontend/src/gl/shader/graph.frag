@@ -15,7 +15,7 @@ void main(){
 
     float rateX = mod(vPos.x - startX, yieldUnit);  
     // rateX  = 1.0;
-    // float rateZ = mod(vPos.z - startZ, dateUnit);
+    float rateZ = mod(vPos.z - startZ, dateUnit);
     float rate = rateX; //min();  
 
     if(rate < 0.2 ){

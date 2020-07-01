@@ -20,3 +20,11 @@ export const grid = { x: 100, y: 10, z: 200 };
 export const scaleYield = 30;
 
 export const yieldValues = ['M1', 'M2', 'M3', 'M6', 'Y1', 'Y3', 'Y5', 'Y7', 'Y10', 'Y20', 'Y30'];
+
+export enum CUSTOM_ORBIT_CONTROLS {
+	UPDATE = 'CUSTOM_ORBIT_CONTROLS:UPDATE',
+}
+
+export enum YIELD_CURVE_LINE {
+	UPDATE = 'yieldCurveLine:update',
+}

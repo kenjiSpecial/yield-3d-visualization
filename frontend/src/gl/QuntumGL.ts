@@ -2,15 +2,9 @@ import {
 	WebGLRenderer,
 	Scene,
 	PerspectiveCamera,
-	BoxGeometry,
 	MeshBasicMaterial,
 	Mesh,
-	BufferAttribute,
-	BufferGeometry,
-	GridHelper,
 	Vector3,
-	RawShaderMaterial,
-	DoubleSide,
 	Vector2,
 	Raycaster,
 	SphereGeometry,
@@ -19,11 +13,11 @@ import { GUI, GUIController } from 'dat.gui';
 import { gsap } from 'gsap';
 import { store } from '../store';
 import { IYieldCurve } from '../store/app';
-import { parseData, createGeometryData } from '../utils/function';
-import { IPlot } from '../components/types/type';
-import { OrbitControls } from 'three-orbitcontrols-ts';
+import { CustomOrbitControls } from './OrbitControl';
 import { Axis } from './axis';
 import { YieldCurveObject } from './YieldCurveLine';
+import { CUSTOM_ORBIT_CONTROLS, YIELD_CURVE_LINE } from '../utils/constants';
+import { LineGraph } from './LineGraph';
 
 export class QuntumGL {
 	private renderer: WebGLRenderer;
@@ -37,16 +31,14 @@ export class QuntumGL {
 		10000
 	);
 	private gui?: GUI;
-	private isLoop: boolean = false;
-	private playAndStopGui?: GUIController;
 	private mesh: Mesh | null = null;
 	private appState: number = 0;
 	private state: string = 'whole';
 	private obj: { progress: number } = { progress: 0 };
 	private targetLookAtPrevPos: Vector3 = new Vector3();
-	private orbitcontrol: OrbitControls;
-	private selectedCountry: string = 'brazil';
-	private prevSelectedCountry: string = 'brazil';
+	private orbitcontrol: CustomOrbitControls;
+	private selectedCountry: string = 'usa';
+	private prevSelectedCountry: string = 'usa';
 	private yieldCurveObjectList: { [key: string]: YieldCurveObject } = {};
 	private axis: Axis;
 	private mouse: Vector2;
@@ -54,10 +46,12 @@ export class QuntumGL {
 	private width: number = 0;
 	private height: number = 0;
 	private debugMesh: Mesh | null = null;
+	private shouldRender: boolean = false;
+	private lineGraph: LineGraph = new LineGraph();
 
 	constructor(canvas: HTMLCanvasElement) {
 		this.loop = this.loop.bind(this);
-
+		this.onUpdateYieldCurveLineHandler = this.onUpdateYieldCurveLineHandler.bind(this);
 		this.renderer = new WebGLRenderer({
 			canvas: canvas,
 			antialias: true,
@@ -67,7 +61,7 @@ export class QuntumGL {
 		this.camera.position.y = 30;
 		this.camera.position.z = 240;
 		this.camera.lookAt(new Vector3(0, 30, 0));
-		this.orbitcontrol = new OrbitControls(this.camera, this.renderer.domElement);
+		this.orbitcontrol = new CustomOrbitControls(this.camera, this.renderer.domElement);
 		if (store.getState().app.isDebug) this.setupDebug();
 		this.axis = new Axis(this.scene);
 		this.mouse = new Vector2(9999, 9999);
@@ -78,88 +72,53 @@ export class QuntumGL {
 
 	private setupDebug() {
 		this.gui = new GUI();
-		this.playAndStopGui = this.gui.add(this, 'playAndStop').name('pause');
-		this.gui.add(this, 'state', ['whole', '2020']).onChange(() => {
+		this.gui.add(this, 'state', ['whole', 'front', 'side', '2020']).onChange(() => {
 			const targetLookAtPrevPos = this.targetLookAtPrevPos.clone();
 
+			const initPos = new Vector3(
+				this.camera.position.x,
+				this.camera.position.y,
+				this.camera.position.z
+			);
+			let targetPos = new Vector3();
+			let targetLookAtPos = new Vector3();
+			let initfunciton = () => {};
+			let compfunciton = () => {};
+
 			if (this.state === 'whole') {
-				const targetPos = new Vector3(-100, 60, 160);
-
-				const initPos = new Vector3(
-					this.camera.position.x,
-					this.camera.position.y,
-					this.camera.position.z
-				);
-
-				gsap.killTweensOf(this.obj, 'progress');
-				this.obj.progress = 0;
-
-				gsap.to(this.obj, {
-					progress: 1,
-					duration: 1.5,
-					ease: 'power2.inOut',
-					onUpdate: () => {
-						this.camera.position.x =
-							initPos.x * (1 - this.obj.progress) + targetPos.x * this.obj.progress;
-						this.camera.position.y =
-							initPos.y * (1 - this.obj.progress) + targetPos.y * this.obj.progress;
-						this.camera.position.z =
-							initPos.z * (1 - this.obj.progress) + targetPos.z * this.obj.progress;
-
-						const lookAt = new Vector3();
-						lookAt.x = targetLookAtPrevPos.x * (1 - this.obj.progress);
-						lookAt.y = targetLookAtPrevPos.y * (1 - this.obj.progress);
-						lookAt.z = targetLookAtPrevPos.z * (1 - this.obj.progress);
-						this.targetLookAtPrevPos = lookAt.clone();
-						this.camera.lookAt(lookAt);
-					},
-					onComplete: () => {
-						this.orbitcontrol.enabled = true;
-					},
-				});
+				targetPos.set(-100, 60, 160);
+				targetLookAtPos.set(0, 0, 0);
+				compfunciton = () => {
+					this.orbitcontrol.enabled = true;
+				};
+			} else if (this.state === 'front') {
+				targetPos.set(0, 0, 250);
+				targetLookAtPos.set(0, 0, 0);
+				compfunciton = () => {
+					this.orbitcontrol.enabled = true;
+				};
+			} else if (this.state === 'side') {
+				targetPos.set(-300, 0, 0);
+				targetLookAtPos.set(0, 0, 0);
+				compfunciton = () => {
+					this.orbitcontrol.enabled = true;
+				};
 			} else {
-				const targetPos = new Vector3(-70, 20, 100);
-				const targetLookAtPos = new Vector3(-30, 0, 95);
-
-				const initPos = new Vector3(
-					this.camera.position.x,
-					this.camera.position.y,
-					this.camera.position.z
-				);
-
-				gsap.killTweensOf(this.obj, 'progress');
-				this.obj.progress = 0;
-
-				gsap.to(this.obj, {
-					progress: 1,
-					duration: 1.5,
-					ease: 'power2.inOut',
-					onStart: () => {
-						this.orbitcontrol.enabled = false;
-					},
-					onUpdate: () => {
-						this.camera.position.x =
-							initPos.x * (1 - this.obj.progress) + targetPos.x * this.obj.progress;
-						this.camera.position.y =
-							initPos.y * (1 - this.obj.progress) + targetPos.y * this.obj.progress;
-						this.camera.position.z =
-							initPos.z * (1 - this.obj.progress) + targetPos.z * this.obj.progress;
-
-						const lookAt = new Vector3();
-						lookAt.x =
-							targetLookAtPos.x * this.obj.progress +
-							targetLookAtPrevPos.x * (1 - this.obj.progress);
-						lookAt.y =
-							targetLookAtPos.y * this.obj.progress +
-							targetLookAtPrevPos.y * (1 - this.obj.progress);
-						lookAt.z =
-							targetLookAtPos.z * this.obj.progress +
-							targetLookAtPrevPos.z * (1 - this.obj.progress);
-						this.targetLookAtPrevPos = lookAt.clone();
-						this.camera.lookAt(lookAt);
-					},
-				});
+				targetPos = new Vector3(-70, 20, 100);
+				targetLookAtPos = new Vector3(-30, 0, 95);
+				initfunciton = () => {
+					this.orbitcontrol.enabled = false;
+				};
 			}
+
+			this.cameraMoveAnimation(
+				initPos,
+				targetPos,
+				targetLookAtPrevPos,
+				targetLookAtPos,
+				initfunciton,
+				compfunciton
+			);
 		});
 
 		this.gui
@@ -177,21 +136,61 @@ export class QuntumGL {
 
 		const sphere = new SphereGeometry(2, 4, 4);
 		const mat = new MeshBasicMaterial({ color: 0xff0000 });
-		this.debugMesh = new Mesh(sphere, mat);
-		this.debugMesh.scale.set(0.1, 0.1, 0.1);
-		// console.log(this.debugMesh);
-	}
-	private playAndStop() {
-		if (this.isLoop) {
-			this.pause();
-			(this.playAndStopGui as GUIController).name('play');
-		} else {
-			this.start();
-			(this.playAndStopGui as GUIController).name('pause');
-		}
 	}
 
-	private loop() {
+	private cameraMoveAnimation(
+		initPos: Vector3,
+		targetPos: Vector3,
+		targetLookAtPrevPos: Vector3,
+		targetLookAtPos: Vector3,
+		customStartFunction?: Function,
+		customCompleteFunction?: Function
+	) {
+		gsap.killTweensOf(this.obj, 'progress');
+		this.obj.progress = 0;
+
+		gsap.to(this.obj, {
+			progress: 1,
+			duration: 1.5,
+			ease: 'power2.inOut',
+			onStart: () => {
+				if (customStartFunction) {
+					customStartFunction();
+				}
+			},
+			onUpdate: () => {
+				this.camera.position.x =
+					initPos.x * (1 - this.obj.progress) + targetPos.x * this.obj.progress;
+				this.camera.position.y =
+					initPos.y * (1 - this.obj.progress) + targetPos.y * this.obj.progress;
+				this.camera.position.z =
+					initPos.z * (1 - this.obj.progress) + targetPos.z * this.obj.progress;
+
+				const lookAt = new Vector3();
+				lookAt.x =
+					targetLookAtPos.x * this.obj.progress +
+					targetLookAtPrevPos.x * (1 - this.obj.progress);
+				lookAt.y =
+					targetLookAtPos.y * this.obj.progress +
+					targetLookAtPrevPos.y * (1 - this.obj.progress);
+				lookAt.z =
+					targetLookAtPos.z * this.obj.progress +
+					targetLookAtPrevPos.z * (1 - this.obj.progress);
+				this.targetLookAtPrevPos = lookAt.clone();
+				this.camera.lookAt(lookAt);
+				this.render();
+			},
+			onComplete: () => {
+				if (customCompleteFunction) {
+					customCompleteFunction();
+				}
+			},
+		});
+	}
+
+	private loop() {}
+
+	private render() {
 		this.raycaster.setFromCamera(this.mouse, this.camera);
 
 		this.axis.update(this.camera);
@@ -206,6 +205,10 @@ export class QuntumGL {
 	}
 
 	private updateIntersect() {
+		if (!this.yieldCurveObjectList[this.selectedCountry]) {
+			return;
+		}
+
 		const intersects = this.raycaster.intersectObject(
 			this.yieldCurveObjectList[this.selectedCountry].mesh
 		);
@@ -233,20 +236,16 @@ export class QuntumGL {
 	}
 
 	private updateCountry() {
+		this.yieldCurveObjectList[this.prevSelectedCountry].removeCurve(this.lineScene);
 		this.scene.remove(this.yieldCurveObjectList[this.prevSelectedCountry]);
 		this.scene.add(this.yieldCurveObjectList[this.selectedCountry]);
+		this.yieldCurveObjectList[this.selectedCountry].addCurve(this.lineScene);
 		this.prevSelectedCountry = this.selectedCountry;
 	}
 
-	public start() {
-		this.isLoop = true;
-		gsap.ticker.add(this.loop);
-	}
+	public start() {}
 
-	public pause() {
-		this.isLoop = false;
-		gsap.ticker.remove(this.loop);
-	}
+	public pause() {}
 
 	public addData(yieldCurveData: { [key: string]: IYieldCurve[] }) {
 		for (const key in yieldCurveData) {
@@ -255,17 +254,20 @@ export class QuntumGL {
 				yieldCurveData[key],
 				this.tempScene
 			);
+			this.yieldCurveObjectList[key].addEventListener(
+				YIELD_CURVE_LINE.UPDATE,
+				this.onUpdateYieldCurveLineHandler
+			);
 		}
 
 		this.scene.add(this.yieldCurveObjectList[this.selectedCountry]);
 
-		this.start();
+		this.render();
 	}
 
 	onKeyDown(ev: KeyboardEvent) {
 		switch (ev.which) {
 			case 27:
-				this.playAndStop();
 				break;
 		}
 	}
@@ -273,6 +275,7 @@ export class QuntumGL {
 	onMouseMove(ev: MouseEvent) {
 		this.mouse.x = (ev.clientX / this.width) * 2 - 1;
 		this.mouse.y = (ev.clientY / this.height) * -2 + 1;
+		this.render();
 	}
 
 	resize() {
@@ -283,12 +286,36 @@ export class QuntumGL {
 		this.camera.updateProjectionMatrix();
 
 		this.renderer.setSize(this.width, this.height);
+
+		this.render();
 	}
 
 	setEvents() {
 		this.onMouseMove = this.onMouseMove.bind(this);
-		this.renderer.domElement.addEventListener('mousemove', this.onMouseMove);
+		window.addEventListener('mousemove', this.onMouseMove);
+		window.addEventListener('resize', () => {
+			this.resize();
+		});
+		this.orbitcontrol.addEventListener(CUSTOM_ORBIT_CONTROLS.UPDATE, () => {
+			this.render();
+		});
 	}
 
 	destroy() {}
+
+	private onUpdateYieldCurveLineHandler(event: {
+		type: string;
+		country: string;
+		date: string;
+		yieldCurve: string;
+	}) {
+		this.lineGraph.updateData(
+			event.country,
+			event.date,
+			event.yieldCurve,
+			this.yieldCurveObjectList[event.country].getPlotData()
+		);
+	}
+
+	public remove() {}
 }
